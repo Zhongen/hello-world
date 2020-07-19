@@ -77,7 +77,6 @@ def load_from_xml(fileNamesAndIDs, res=5, includeCats=[],
 		  if diff > res:
 			  if verbose:
 				  print(" Warning: bgl data discontinuity at {}".format(prevDT))
-				  #interpolate bgl if is not exited
 			  s = int(diff // res - (diff % res == 0))
 			  m = (curLvl - prevLevel) / diff
 			  for i in range(s):
@@ -378,7 +377,7 @@ def calculate_stats(patients,
 		                           meal_bolus_distance=meal_bolus_distance, 
 		                           time_res=time_res, 
 		                           use_bolus_carbs=use_bolus_carbs
-				                  )                   
+				                  )             
 				                                       
 		stats[d] = {}
        
@@ -392,8 +391,6 @@ def calculate_stats(patients,
 			for c in ['bgl', 'basal', 'bolus', 'bolus_carbs', 'meal']:
 				nonzero_data = dataRaw[p][:, index[c]]
 				nonzero_data = nonzero_data[nonzero_data != 0]
-				if c == 'meal':
-					nonzero_data = nonzero_data[nonzero_data != 450]
 				stats[d][p][c]['amount'] = nonzero_data.shape[0]
 				stats[d][p][c]['average'] = np.average(nonzero_data)
 				stats[d][p][c]['max'] = np.max(nonzero_data)
@@ -415,7 +412,6 @@ def calculate_stats(patients,
 			for p in patients:
 				nonzero_data = dataRaw[p][:, index[c]]
 				nonzero_data = nonzero_data[nonzero_data != 0]
-				nonzero_data = nonzero_data[nonzero_data != 450]
 				if first:
 					combined_data[c] = nonzero_data
 					first = False
@@ -432,7 +428,7 @@ def calculate_stats(patients,
 				all_data['total'][c] = combined_data[c]
 			else:
 				all_data['total'][c] = np.append(all_data['total'][c], combined_data[c])
-		####################################################################################################	
+			
 		if d == 'training':
 			for p in patients:
 				mins[p] = dataRaw[p].min(axis=0)
@@ -552,54 +548,56 @@ def calculate_stats(patients,
 	return information
 	
 def pre_process_data(patients, raw_data, meal_bolus_distance=10, time_res=5, use_bolus_carbs=False):
-	offset = int(meal_bolus_distance / time_res)
+	if meal_bolus_distance != None:
+		offset = int(meal_bolus_distance / time_res)
 	for p in patients:	
 		for i in range(len(raw_data[p])):
 			if raw_data[p][i][index['meal']] == 450:
 				raw_data[p][i][index['meal']] = 0
 		
-			if raw_data[p][i][index['bolus']] != 0 and raw_data[p][i][index['bolus_carbs']] != 0 and (raw_data[p][i][index['bolus_type']] == bolus_type_values['normal'] or raw_data[p][i][index['bolus_type']] == bolus_type_values['normal dual']):
-				meal_value = raw_data[p][i][index['bolus_carbs']]
-				carb_value = 0
-				
-				event_time = i
-				closest_meal_found = False
-				closest_meal = None
-				left_index = i
-				right_index = i
-				
-				while not closest_meal_found:
-					if left_index < 0 or right_index >= len(raw_data[p]):
-						break
-					else:
-						if raw_data[p][left_index][index['meal']] != 0 and raw_data[p][right_index][index['meal']] != 0:
-							m1 = raw_data[p][left_index][index['meal']]
-							m2 = raw_data[p][right_index][index['meal']]
-							if abs(m1 - meal_value) < abs(m2 - meal_value):
-								carb_value = m1
-								closest_meal = left_index
-							else:
-								carb_value = m2
-								closest_meal = right_index
-							closest_meal_found = True
-						elif raw_data[p][left_index][index['meal']] != 0:
-							carb_value = raw_data[p][left_index][index['meal']]
-							closest_meal = left_index
-							closest_meal_found = True
-						elif raw_data[p][right_index][index['meal']] != 0:
-							carb_value = raw_data[p][right_index][index['meal']]
-							closest_meal = right_index
-							closest_meal_found = True
-						left_index -= 1
-						right_index += 1
-						
-				if not use_bolus_carbs:
-					meal_value = carb_value
+			if meal_bolus_distance != None:
+				if raw_data[p][i][index['bolus']] != 0 and raw_data[p][i][index['bolus_carbs']] != 0 and (raw_data[p][i][index['bolus_type']] == bolus_type_values['normal'] or raw_data[p][i][index['bolus_type']] == bolus_type_values['normal dual']):
+					meal_value = raw_data[p][i][index['bolus_carbs']]
+					carb_value = 0
 					
-				if closest_meal_found:
-					raw_data[p][closest_meal][index['meal']] = 0
-					raw_data[p][event_time + offset][index['meal']] = meal_value		
-		
+					event_time = i
+					closest_meal_found = False
+					closest_meal = None
+					left_index = i
+					right_index = i
+					
+					while not closest_meal_found:
+						if left_index < 0 or right_index >= len(raw_data[p]):
+							break
+						else:
+							if raw_data[p][left_index][index['meal']] != 0 and raw_data[p][right_index][index['meal']] != 0:
+								m1 = raw_data[p][left_index][index['meal']]
+								m2 = raw_data[p][right_index][index['meal']]
+								if abs(m1 - meal_value) < abs(m2 - meal_value):
+									carb_value = m1
+									closest_meal = left_index
+								else:
+									carb_value = m2
+									closest_meal = right_index
+								closest_meal_found = True
+							elif raw_data[p][left_index][index['meal']] != 0:
+								carb_value = raw_data[p][left_index][index['meal']]
+								closest_meal = left_index
+								closest_meal_found = True
+							elif raw_data[p][right_index][index['meal']] != 0:
+								carb_value = raw_data[p][right_index][index['meal']]
+								closest_meal = right_index
+								closest_meal_found = True
+							left_index -= 1
+							right_index += 1
+							
+					if not use_bolus_carbs:
+						meal_value = carb_value
+						
+					if closest_meal_found:
+						raw_data[p][closest_meal][index['meal']] = 0
+						raw_data[p][event_time + offset][index['meal']] = meal_value		
+			
 	return raw_data
 	
 def create_examples(scaled_data,
@@ -610,27 +608,34 @@ def create_examples(scaled_data,
                     possible_times, 
                     event_start, 
                     avgs, 
-                    event_type='meal', 
+                    event_type='meal',
                     approach=2, 
                     meal_bolus_distance=10,
                     pred_horizon=60, 
                     event_offset=10, 
-                    pre_event_sequence=180, 
+                    pre_event_sequence=360, 
                     time_res=5,
-                    combo=False
+                    combo=False, 
+                   	max_time=None
                    ):
                    
 	examples = []
 	pretrain_examples = []
-			
-	max_time_value = max(possible_times) + int(event_offset / time_res)
+		
+	if max_time is None:	
+		max_time_value = max(possible_times) + int(event_offset / time_res) - 1
+	else:
+		max_time_value = int(max_time / time_res) + int(event_offset / time_res) - 1
 	
 	time_of_event = time_stamps[event_start]
 	
 	event = scaled_data[event_start][index[event_type]]
 	pretrain_event = pretrain_data[event_start][index[event_type]]
 	
-	distance = int(meal_bolus_distance / time_res)
+	if meal_bolus_distance != None:
+		distance = int(meal_bolus_distance / time_res)
+	else:
+		distance = 0
 
 	for j in possible_times:
 		if approach == 2:
@@ -656,21 +661,14 @@ def create_examples(scaled_data,
 		bgl_target = scaled_data[window_end][index['bgl']]
 		pretrain_bgl_target = pretrain_data[window_end][index['bgl']]
 		
+		if combo:
+			secondary_event = scaled_data[event_start + distance][index['meal']]
+			pretrain_secondary_event = scaled_data[event_start + distance][index['meal']]
+		
 		seq1_len = int(pre_event_sequence / time_res)
 		seq1 = []
 		pretrain_seq1 = []
 		seq1_start = window_start - seq1_len
-		
-		temp = '''
-		if seq1_start >= 0:
-			for k in range(seq1_start, window_start):
-				features = scaled_data[k]
-				bgl_feature = features[index['bgl']]
-				insulin_feature = features[index['bolus']] + features[index['basal']]
-				carbs_feature = features[index['meal']]
-				
-				seq1.append([bgl_feature, insulin_feature, carbs_feature])
-		'''
 		
 		if seq1_start < 0:
 							
@@ -678,7 +676,7 @@ def create_examples(scaled_data,
 				seq1.append([0.0, 0.0, 0.0])
 				pretrain_seq1.append([0.0, 0.0, 0.0])
 				
-			for k in range(window_start):
+			for k in range(window_start + 1):
 				features = scaled_data[k]
 				bgl_feature = features[index['bgl']]
 				insulin_feature = features[index['bolus']] + features[index['basal']]
@@ -694,7 +692,7 @@ def create_examples(scaled_data,
 				pretrain_seq1.append([bgl_feature, insulin_feature, carbs_feature])
 		else:
 		
-			for k in range(seq1_start, window_start):
+			for k in range(seq1_start, window_start + 1):
 				features = scaled_data[k]
 				bgl_feature = features[index['bgl']]
 				insulin_feature = features[index['bolus']] + features[index['basal']]
@@ -714,7 +712,7 @@ def create_examples(scaled_data,
 		
 		seq2 = []
 		pretrain_seq2 = []
-		seq2_start = window_start
+		seq2_start = window_start + 1
 		
 		event_before = False
 		event_after = False
@@ -724,7 +722,6 @@ def create_examples(scaled_data,
 			features = scaled_data[k]
 			insulin_feature = features[index['bolus']]
 			carbs_feature = features[index['meal']]
-			
 			if k == event_start:
 				if event_type == 'meal':
 					carbs_feature = 0.0
@@ -775,22 +772,37 @@ def create_examples(scaled_data,
 				avg = avgs[time[1]]
 				break
 		
-		
-		example = {'label': event,
-				   'input1': seq1,
-				   'input2': seq2,
-				   'input3': np.array([bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - scaling['min']) / scaling['max']]),
-				   'case': case
-				  }
+		if combo:
+			example = {'label': event,
+					   'input1': seq1,
+					   'input2': seq2,
+					   'input3': np.array([bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - scaling['min']) / scaling['max']] + [secondary_event]),
+					   'case': case
+					  }
+		else:
+			example = {'label': event,
+					   'input1': seq1,
+					   'input2': seq2,
+					   'input3': np.array([bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - scaling['min']) / scaling['max']]),
+					   'case': case
+					  }
 			
 		examples.append(example)
 		
-		pretrain_example = {'label': pretrain_event,
-							'input1': pretrain_seq1,
-							'input2': pretrain_seq2,
-							'input3': np.array([pretrain_bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - pretrain_scaling['min']) / pretrain_scaling['max']]),
-							'case': case
-						   }
+		if combo:
+			pretrain_example = {'label': pretrain_event,
+								'input1': pretrain_seq1,
+								'input2': pretrain_seq2,
+								'input3': np.array([pretrain_bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - pretrain_scaling['min']) / pretrain_scaling['max']] + [pretrain_secondary_event]),
+								'case': case
+							   }
+		else:
+			pretrain_example = {'label': pretrain_event,
+								'input1': pretrain_seq1,
+								'input2': pretrain_seq2,
+								'input3': np.array([pretrain_bgl_target] + [time_value / int(max_time_value * time_res)] + [(avg - pretrain_scaling['min']) / pretrain_scaling['max']]),
+								'case': case
+							   }
 						   
 		pretrain_examples.append(pretrain_example)
 		
@@ -886,10 +898,13 @@ def load_carbs_data(patients,
                     files, 
                     stats_file = None,
                     approach=2,
+                    times=['30','35', '40', '45', '50', '55', '60', '65', '70', '75', '80', '85', '90'],
                     meal_bolus_distance=10, 
                     time_res=5, 
-                    pred_horizon=60, 
-                    combined=True
+                    pred_horizon=60,
+                    use_bolus_carbs=False, 
+                    combined=False,
+                    max_time=None
                    ):
 
 	if stats_file == None:           
@@ -903,11 +918,6 @@ def load_carbs_data(patients,
 		fd = open(stats_file, 'rb')
 		information = pickle.load(fd)
 		fd.close()
-	
-	if approach == 2:
-		times = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]
-	else:
-		times = [0, 5, 10, 15, 20, 25, 30]
 		
 	possible_times = []
 	for t in times:
@@ -932,7 +942,7 @@ def load_carbs_data(patients,
 		                                                        verbose=False, 
 		                                                       )
 		                                                       
-		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=False)
+		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=use_bolus_carbs)
 		                                                       
 		all_examples[d] = {}
 		all_pretrain_examples[d] = []
@@ -953,7 +963,7 @@ def load_carbs_data(patients,
 		for p in patients:
 			
 			avgs = information['avgs_by_time'][p]
-			
+
 			for i in range(len(scaled_data[p])):
 				if scaled_data[p][i][index['meal']] != 0:
 					event_start = i
@@ -970,7 +980,8 @@ def load_carbs_data(patients,
 							                   meal_bolus_distance=meal_bolus_distance,
 							                   pred_horizon=pred_horizon, 
 							                   event_offset=event_offset,
-							                   combo=False
+							                   combo=False,
+							                   max_time=max_time
 							                  )
 							                  
 					(ex, p_ex) = examples
@@ -998,11 +1009,14 @@ def load_carbs_data(patients,
 def load_bolus_data(patients, 
                     files, 
                     stats_file = None,
-                    approach=2, 
+                    approach=2,
+                    times=['30','35', '40', '45', '50', '55', '60', '65', '70', '75', '80', '85', '90'],
                     meal_bolus_distance=10,
                     time_res=5, 
                     pred_horizon=60, 
-                    combined=True
+                    use_bolus_carbs=False,
+                    combined=False,
+                    max_time=None
                    ):
 
 	if stats_file == None:           
@@ -1017,11 +1031,6 @@ def load_bolus_data(patients,
 		information = pickle.load(fd)
 		fd.close()
 	
-	if approach == 2:
-		times = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]
-	else:
-		times = [0, 5, 10, 15, 20, 25, 30]
-		
 	possible_times = []
 	for t in times:
 		possible_times.append(int(t / time_res)) 
@@ -1045,7 +1054,7 @@ def load_bolus_data(patients,
 		                                                        verbose=False, 
 		                                                       )
 		                                                       
-		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=False)
+		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=use_bolus_carbs)
 		                                                       
 		all_examples[d] = {}
 		all_pretrain_examples[d] = []
@@ -1083,7 +1092,8 @@ def load_bolus_data(patients,
 							                   meal_bolus_distance=meal_bolus_distance,
 							                   pred_horizon=pred_horizon, 
 							                   event_offset=event_offset,
-							                   combo=False
+							                   combo=False,
+							                   max_time=max_time
 							                  )
 							                  
 					(ex, p_ex) = examples
@@ -1112,10 +1122,13 @@ def load_combo_data(patients,
                     files, 
                     stats_file = None,
                     approach=2, 
+                    times=['30','35', '40', '45', '50', '55', '60', '65', '70', '75', '80', '85', '90'],
                     meal_bolus_distance=10,
                     time_res=5, 
                     pred_horizon=60, 
-                    combined=True
+                    use_bolus_carbs=False,
+                    combined=False,
+                    max_time=None
                    ):
                    
 	distance = int(meal_bolus_distance / time_res)
@@ -1131,11 +1144,6 @@ def load_combo_data(patients,
 		fd = open(stats_file, 'rb')
 		information = pickle.load(fd)
 		fd.close()
-	
-	if approach == 2:
-		times = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]
-	else:
-		times = [0, 5, 10, 15, 20, 25, 30]
 		
 	possible_times = []
 	for t in times:
@@ -1160,7 +1168,7 @@ def load_combo_data(patients,
 		                                                        verbose=False, 
 		                                                       )
 		                                                       
-		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=False)
+		raw_data = pre_process_data(patients, raw_data, meal_bolus_distance=meal_bolus_distance, time_res=time_res, use_bolus_carbs=use_bolus_carbs)
 		                                                       
 		all_examples[d] = {}
 		all_pretrain_examples[d] = []
@@ -1197,7 +1205,8 @@ def load_combo_data(patients,
 									               meal_bolus_distance=meal_bolus_distance,
 									               pred_horizon=pred_horizon, 
 									               event_offset=event_offset,
-									               combo=True
+									               combo=True,
+									               max_time=max_time
 									              )
 									              
 						(ex, p_ex) = examples
@@ -1226,9 +1235,9 @@ if __name__ == '__main__':
 
 	patients = ['559', '563', '570', '575', '588', '591']
 
-	training_files = ['/home/zhongen/Documents/2020summer/EventPrediction/data/training/' + pID + '-ws-training-new.xml' for pID in patients]
-	testing_files = ['/home/zhongen/Documents/2020summer/EventPrediction/data/testing/' + pID + '-ws-testing.xml' for pID in patients]
-	validation_files = ['/home/zhongen/Documents/2020summer/EventPrediction/data/validation/' + pID + '-ws-validation.xml' for pID in patients]
+	training_files = ['/home/jeremy/EventPrediction/data/data/training/' + pID + '-ws-training-new.xml' for pID in patients]
+	testing_files = ['/home/jeremy/EventPrediction/data/data/testing/' + pID + '-ws-testing.xml' for pID in patients]
+	validation_files = ['/home/jeremy/EventPrediction/data/data/validation/' + pID + '-ws-validation.xml' for pID in patients]
 	files = {'training': training_files, 'testing': testing_files, 'validation': validation_files}
 
 
@@ -1243,8 +1252,8 @@ if __name__ == '__main__':
 				                     event_type='meal', 
 				                     time_res=5, 
 				                     meal_bolus_distance=10,
-				                     use_bolus_carbs=False,
-				                     combined=True, 
+				                     use_bolus_carbs=True,
+				                     combined=False, 
 				                     save=True
 				                    )
 	if (bolus or combo) and not stats_loaded:                 
@@ -1253,8 +1262,8 @@ if __name__ == '__main__':
 				                      event_type='bolus', 
 				                      time_res=5, 
 				                      meal_bolus_distance=10,
-				                      use_bolus_carbs=False,
-				                      combined=True, 
+				                      use_bolus_carbs=True,
+				                      combined=False, 
 				                      save=True
 				                     )
 				                     
@@ -1263,32 +1272,39 @@ if __name__ == '__main__':
 				                     files, 
 				                     stats_file='stats_meal.pkl',
 				                     approach=2, 
+				                     times=[30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90],
 				                     meal_bolus_distance=10,
-				                     time_res=5, 
-				                     pred_horizon=60, 
-				                     combined=True
+				                     time_res=5,
+				                     pred_horizon=60,
+				                     use_bolus_carbs=True,
+				                     combined=False
 				                    )
 	
 	if bolus:	                       
 		bolus_data = load_bolus_data(patients, 
 				                     files, 
 				                     stats_file='stats_bolus.pkl',
-				                     approach=2, 
+				                     approach=2,
+				                     times=[30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90],
 				                     meal_bolus_distance=10,
 				                     time_res=5, 
 				                     pred_horizon=60, 
-				                     combined=True
+				                     use_bolus_carbs=True,
+				                     combined=False
 				                    )
 	if combo:                    
 		combo_data = load_combo_data(patients, 
 				                     files, 
 				                     stats_file='stats_bolus.pkl',
 				                     approach=2, 
+				                     times=[30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90],
 				                     meal_bolus_distance=10,
 				                     time_res=5,
 				                     pred_horizon=60, 
-				                     combined=True
+				                     use_bolus_carbs=True,
+				                     combined=False
 				                    )
+				                   
 		                       
 	if carbs:
 		fd = open('carbs_data.pkl', 'wb')
