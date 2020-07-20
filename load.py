@@ -613,7 +613,7 @@ def create_examples(scaled_data,
                     meal_bolus_distance=10,
                     pred_horizon=60, 
                     event_offset=10, 
-                    pre_event_sequence=360, 
+                    pre_event_sequence=1, 
                     time_res=5,
                     combo=False, 
                    	max_time=None
@@ -757,6 +757,13 @@ def create_examples(scaled_data,
 
 		seq2 = np.array(seq2)
 		pretrain_seq2 = np.array(pretrain_seq2)
+		
+		t0_events = scaled_data[window_start]
+		t0_bolus = t0_events[index['bolus']]
+		t0_carbs = t0_events[index['meal']]
+		
+		if t0_bolus != 0.0 or t0_carbs != 0.0:
+			event_before = True
 		
 		case = None
 		if (not event_before) and (not event_after):
@@ -1235,16 +1242,16 @@ if __name__ == '__main__':
 
 	patients = ['559', '563', '570', '575', '588', '591']
 
-	training_files = ['/home/jeremy/EventPrediction/data/data/training/' + pID + '-ws-training-new.xml' for pID in patients]
-	testing_files = ['/home/jeremy/EventPrediction/data/data/testing/' + pID + '-ws-testing.xml' for pID in patients]
-	validation_files = ['/home/jeremy/EventPrediction/data/data/validation/' + pID + '-ws-validation.xml' for pID in patients]
+	training_files = ['../training/' + pID + '-ws-training-new.xml' for pID in patients]
+	testing_files = ['../testing/' + pID + '-ws-testing.xml' for pID in patients]
+	validation_files = ['../validation/' + pID + '-ws-validation.xml' for pID in patients]
 	files = {'training': training_files, 'testing': testing_files, 'validation': validation_files}
 
 
 	stats_loaded = False
 	carbs = True
-	bolus = True
-	combo = True
+	bolus = False
+	combo = False
 	
 	if carbs and not stats_loaded:
 		meal_stats = calculate_stats(patients, 
@@ -1307,7 +1314,7 @@ if __name__ == '__main__':
 				                   
 		                       
 	if carbs:
-		fd = open('carbs_data.pkl', 'wb')
+		fd = open('carbs_data1.pkl', 'wb')
 		pickle.dump(carbs_data, fd)
 		fd.close()
 
@@ -1320,3 +1327,4 @@ if __name__ == '__main__':
 		fd = open('combo_data.pkl', 'wb')
 		pickle.dump(combo_data, fd)
 		fd.close()
+
